@@ -52,6 +52,7 @@ require_once( 'classes/class-ep-wp-date-query.php' );
 require_once( 'classes/class-ep-feature.php' );
 require_once( 'classes/class-ep-features.php' );
 require_once( 'classes/class-ep-dashboard.php' );
+require_once( 'classes/class-ep-index-command-data-provider.php' );
 
 // Include core features
 require_once( 'features/search/search.php' );

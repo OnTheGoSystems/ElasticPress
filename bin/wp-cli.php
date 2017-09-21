@@ -458,65 +458,31 @@ class ElasticPress_CLI_Command extends WP_CLI_Command {
 			$show_bulk_errors = true;
 		}
 
-		$posts_per_page = 350;
+		global $wpdb;
+		$data_provider = new EP_Index_Command_Data_Provider( $wpdb, $args );
 
-		if ( ! empty( $args['posts-per-page'] ) ) {
-			$posts_per_page = absint( $args['posts-per-page'] );
-		}
-
-		$offset = 0;
-
-		if ( ! empty( $args['offset'] ) ) {
-			$offset = absint( $args['offset'] );
-		}
-
-		$post_type = ep_get_indexable_post_types();
-
-		if ( ! empty( $args['post-type'] ) ) {
-			$post_type = explode( ',', $args['post-type'] );
-			$post_type = array_map( 'trim', $post_type );
-		}
-
-		if ( is_array( $post_type ) ) {
-			$post_type = array_values( $post_type );
-		}
-
-		/**
-		 * Create WP_Query here and reuse it in the loop to avoid high memory consumption.
-		 */
-		$query = new WP_Query();
+		$count = (int) $data_provider->get_count();
 
 		while ( true ) {
+			$ids = $data_provider->get_chunk();
 
-			$args = apply_filters( 'ep_index_posts_args', array(
-				'posts_per_page'         => $posts_per_page,
-				'post_type'              => $post_type,
-				'post_status'            => ep_get_indexable_post_status(),
-				'offset'                 => $offset,
-				'ignore_sticky_posts'    => true,
-				'orderby'                => 'ID',
-				'order'                  => 'DESC',
-			) );
-			$query->query( $args );
+			if ( count( $ids ) ) {
 
-			if ( $query->have_posts() ) {
-
-				while ( $query->have_posts() ) {
-					$query->the_post();
+				foreach ($ids as $id) {
 
 					if ( $no_bulk ) {
 						// index the posts one-by-one. not sure why someone may want to do this.
-						$result = ep_sync_post( get_the_ID() );
+						$result = ep_sync_post( $id );
 						
 						$this->reset_transient();
 
-						do_action( 'ep_cli_post_index', get_the_ID() );
+						do_action( 'ep_cli_post_index', $id );
 					} else {
-						$result = $this->queue_post( get_the_ID(), $query->post_count, $show_bulk_errors );
+						$result = $this->queue_post( $id, count($ids), $show_bulk_errors );
 					}
 
 					if ( ! $result ) {
-						$errors[] = get_the_ID();
+						$errors[] = $id;
 					} elseif ( true === $result || isset( $result->_index ) ) {
 						$synced ++;
 					}
@@ -525,9 +491,9 @@ class ElasticPress_CLI_Command extends WP_CLI_Command {
 				break;
 			}
 
-			WP_CLI::log( 'Processed ' . ( $query->post_count + $offset ) . '/' . $query->found_posts . ' entries. . .' );
+			WP_CLI::log( 'Processed ' . ( count( $ids ) + $data_provider->get_offset() ) . '/' . $count . ' entries. . .' );
 
-			$offset += $posts_per_page;
+			$data_provider->next();
 
 			usleep( 500 );
 

@@ -532,6 +532,7 @@ class EP_API {
 	 * @return bool|array
 	 */
 	public function prepare_post( $post_id ) {
+		global $post;
 		$post = get_post( $post_id );
 
 		$user = get_userdata( $post->post_author );
